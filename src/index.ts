@@ -9,22 +9,45 @@ import type { PluginConfig, Router } from './types';
 
 const require = createRequire(import.meta.url);
 
-const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => ({
-  name: 'vite-plugin-local-mock',
-  apply: 'serve',
-  configureServer(server: ViteDevServer) {
-    server.middlewares.use(
-      async (
-        req: http.IncomingMessage,
-        res: http.ServerResponse,
-        next: Function
-      ) => {
-        const options = {
-          dir: 'mock',
-          enable: true,
-          ...(opt || {}),
-        };
+/**
+ * Mock data response with optional delay
+ * @param res - HTTP response object
+ * @param data - Mock data to send
+ * @param delay - Delay in milliseconds
+ */
+function sendMockResponse(res: http.ServerResponse, data: any, delay?: number): void {
+  const sendResponse = () => {
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(data));
+  };
 
+  if (delay && delay > 0) {
+    setTimeout(sendResponse, delay);
+  } else {
+    sendResponse();
+  }
+}
+
+/**
+ * Vite plugin for local mock data
+ * @param opt - Plugin configuration options
+ * @returns Vite plugin
+ */
+const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
+  // Default configuration
+  const options: Required<PluginConfig> = {
+    dir: 'mock',
+    enable: true,
+    pathMapConfig: '',
+    delay: 0,
+    ...opt,
+  };
+
+  return {
+    name: 'vite-plugin-local-mock',
+    apply: 'serve',
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req: http.IncomingMessage, res: http.ServerResponse, next: Function) => {
         if (!options.enable) {
           next();
           return;
@@ -38,55 +61,64 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => ({
         try {
           let routers: Router[] = [];
           if (options.pathMapConfig) {
-            const pathMapFile = path.join(
-              process.cwd(),
-              options.dir,
-              options.pathMapConfig + '.cjs'
-            );
+            const pathMapFile = path.join(process.cwd(), options.dir, options.pathMapConfig + '.cjs');
 
             if (fs.existsSync(pathMapFile)) {
-              delete require.cache[pathMapFile];
-              routers = require(pathMapFile);
+              try {
+                delete require.cache[pathMapFile];
+                routers = require(pathMapFile);
+              } catch (err) {
+                // Error loading router config
+              }
             }
           }
 
-          const [filePath, urlParams] = getMockPathInfo(req.url, routers) as [
-            string,
-            Object
-          ];
-          const mockPath = path.join(
-            process.cwd(),
-            options.dir,
-            filePath + '.cjs'
-          );
+          const [filePath, urlParams] = getMockPathInfo(req.url, routers);
+          const mockPath = path.join(process.cwd(), options.dir, filePath + '.cjs');
 
-          delete require.cache[mockPath];
-          const mockModule = require(mockPath);
+          if (!fs.existsSync(mockPath)) {
+            next();
+            return;
+          }
 
-          const bodyStr = await getRawBody(req, {
-            encoding: 'utf-8',
-          });
+          try {
+            delete require.cache[mockPath];
+            const mockModule = require(mockPath);
 
-          const params = {
-            ...JSON.parse(bodyStr || '{}'),
-            ...urlParams,
-          };
+            if (!mockModule.__mock) {
+              next();
+              return;
+            }
 
-          const mockData = makeMockData(mockModule, params);
+            let bodyData = {};
+            try {
+              const bodyStr = await getRawBody(req, {
+                encoding: 'utf-8',
+              });
+              if (bodyStr) {
+                bodyData = JSON.parse(bodyStr);
+              }
+            } catch (bodyError) {
+              // Error parsing request body
+            }
 
-          if (mockData.__mock) {
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify(mockData));
-          } else {
+            const params = {
+              ...bodyData,
+              ...urlParams,
+            };
+
+            const mockData = makeMockData(mockModule, params);
+
+            sendMockResponse(res, mockData, options.delay);
+          } catch (moduleError) {
             next();
           }
         } catch (error) {
-          // console.error(error);
           next();
         }
-      }
-    );
-  },
-});
+      });
+    },
+  };
+};
 
 export default viteLocalMockPlugin;

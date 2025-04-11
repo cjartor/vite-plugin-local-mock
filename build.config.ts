@@ -1,14 +1,12 @@
-import { defineBuildConfig } from 'unbuild'
+import { defineConfig } from 'tsup';
 
-export default defineBuildConfig({
-  entries: ['src/index'],
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['cjs', 'esm'],
+  dts: true,
+  splitting: false,
+  sourcemap: false,
   clean: true,
-  declaration: true,
-  rollup: {
-    emitCJS: true,
-    inlineDependencies: true,
-    esbuild: {
-      target: 'node18',
-    },
-  },
-})
+  target: 'node20',
+  outDir: 'dist',
+});

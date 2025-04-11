@@ -1,99 +1,185 @@
 # vite-plugin-local-mock
 
-## 特点
+A lightweight and flexible mock data plugin for Vite, perfect for frontend development without a backend API.
 
-[使用简单！example](https://github.com/tipace/pokemon-api-demo)
+## Features
 
-## 安装
+- 🚀 Simple setup and configuration
+- 🔄 Support for dynamic routes with REST-style parameters
+- 📊 Support for dynamic response generation based on request parameters
+- ⏱️ Configurable response delay to simulate network latency
+- 📝 Detailed logging for easy debugging
+- 💾 Response caching for improved performance
+
+## Installation
 
 ```bash
 npm i vite-plugin-local-mock -D
+# or
+yarn add vite-plugin-local-mock -D
+# or
+pnpm add vite-plugin-local-mock -D
 ```
 
-在 vite.config.js 中配置插件
+## Setup
+
+Add the plugin to your `vite.config.js` or `vite.config.ts`:
 
 ```js
-import { defineConfig } from 'vite'
-import localMock from 'vite-plugin-local-mock'
+import { defineConfig } from 'vite';
+import localMock from 'vite-plugin-local-mock';
 
 export default defineConfig({
-  plugins: [localMock()]
-}
+  plugins: [
+    localMock({
+      dir: 'mock',
+      enable: true,
+      pathMapConfig: 'mockMap',
+      delay: 300, // milliseconds
+    }),
+  ],
+});
 ```
 
-## 插件配置参数
+## Configuration Options
 
-- **enable** [boolean]: 是否开启 mock，默认 true
-- **dir**【string】： mock 文件的目录名，默认'mock'
-- **pathMapConfig**【string】:动态路由映射文件路径
+| Option          | Type      | Default  | Description                                                 |
+| --------------- | --------- | -------- | ----------------------------------------------------------- |
+| `dir`           | `string`  | `'mock'` | Directory for mock files                                    |
+| `enable`        | `boolean` | `true`   | Enable or disable the plugin                                |
+| `pathMapConfig` | `string`  | `''`     | Filename for path mapping configuration (without extension) |
+| `delay`         | `number`  | `0`      | Response delay in milliseconds to simulate network latency  |
 
-## 使用
+## Usage
 
-在 mock 文件夹中创建 mock 文件，文件名为请求路径，格式为 cjs：
+### Basic Usage
 
-```cjs
-// mock/user.cjs
-export default {
-  /**
-   * 整个mock设计中最关键的设置，只有顶部返回了该字段为true才会生效
-   * 在项目运行中，也方便通过查看接口返回是否有这个字段来判断是否是mock接口
-   */
+Create a mock file in the `mock` directory. The filename should match the request path and use the `.cjs` extension:
+
+```js
+// mock/api/user.cjs
+module.exports = {
+  // Required flag to enable mocking
   __mock: true,
+
+  // Your response data
   code: 0,
   data: {
-    name: 'test',
+    name: 'John Doe',
+    email: 'john@example.com',
+    role: 'admin',
   },
 };
 ```
 
-```cjs
-export default {
-  __mock: true,
-  code: 0,
-  data: {
-    /**
-     * 支持方法返回，入参为{...query, ...restfullParams, ...body}
-     */
-    name(params) {
-      return 'test';
-    },
-  },
-};
-```
+### Dynamic Responses
 
-```cjs
-/**
- * 支持方法返回，入参为{...query, ...restfullParams, ...body}
- */
-export default (params) => ({
+You can define dynamic responses based on request parameters:
+
+```js
+// mock/api/login.cjs
+module.exports = (params) => ({
   __mock: true,
   code: 0,
   data: {
-    /**
-     * 支持方法返回，入参为{...query, ...body}
-     */
-    name: 'test',
+    username: params.username || 'guest',
+    token: 'mock-token-' + Date.now(),
+    loginTime: new Date().toISOString(),
   },
 });
 ```
 
-对于 restful 的动态接口，需要配置映射文件，即配置**pathMapConfig**，例如
+### REST API Mocking
+
+For RESTful APIs with dynamic parameters, configure a mapping file:
+
+1. Set the `pathMapConfig` option in your Vite config:
 
 ```js
 localMock({
   pathMapConfig: 'mockMap',
-}),
+});
 ```
 
-需要在 mock 目录下新建 **mockMap.cjs**
+2. Create a `mockMap.cjs` file in your mock directory:
 
-```cjs
+```js
+// mock/mockMap.cjs
 module.exports = [
   {
-    url: 'api/v2/pokemon/post/:name',
-    path: 'poke',
+    url: 'api/users/:id',
+    path: 'api/user-detail',
+  },
+  {
+    url: 'api/products/:category/:id',
+    path: 'api/product-detail',
   },
 ];
 ```
 
-比如请求匹配到第一条 url，便会尝试从 mock/poke.cjs 中读取数据，优先级从上到下递减，如果没有匹配到，会走默认的完整路径映射文件的数据
+3. Create the corresponding mock files:
+
+```js
+// mock/api/user-detail.cjs
+module.exports = (params) => ({
+  __mock: true,
+  code: 0,
+  data: {
+    id: params.id,
+    name: `User ${params.id}`,
+    email: `user${params.id}@example.com`,
+  },
+});
+```
+
+## Examples
+
+### GET Request with Query Parameters
+
+Request: `GET /api/users?page=1&limit=10`
+
+Mock file: `mock/api/users.cjs`
+
+```js
+module.exports = (params) => ({
+  __mock: true,
+  code: 0,
+  data: {
+    page: parseInt(params.page) || 1,
+    limit: parseInt(params.limit) || 10,
+    total: 100,
+    users: Array.from({ length: parseInt(params.limit) || 10 }, (_, i) => ({
+      id: i + 1 + (parseInt(params.page) - 1 || 0) * (parseInt(params.limit) || 10),
+      name: `User ${i + 1}`,
+    })),
+  },
+});
+```
+
+### POST Request with Body
+
+Request: `POST /api/login` with body `{ "username": "admin", "password": "123456" }`
+
+Mock file: `mock/api/login.cjs`
+
+```js
+module.exports = (params) => {
+  if (params.username === 'admin' && params.password === '123456') {
+    return {
+      __mock: true,
+      code: 0,
+      data: {
+        token: 'mock-token-admin',
+        username: 'admin',
+        role: 'administrator',
+      },
+    };
+  } else {
+    return {
+      __mock: true,
+      code: 1001,
+      message: 'Invalid username or password',
+    };
+  }
+};
+```
