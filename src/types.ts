@@ -18,6 +18,10 @@ export interface PluginConfig {
    * Response delay in milliseconds (simulates network latency)
    */
   delay?: number;
+  /**
+   * Whether to use pnpm workspace, default is false
+   */
+  isPnpmWorkspace?: boolean;
 }
 
 /**

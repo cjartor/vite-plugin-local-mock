@@ -1,6 +1,10 @@
 import http from 'node:http';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import { parse } from 'regexparam';
 import queryString from 'query-string';
+import path from 'node:path';
+import fs from 'node:fs';
 import type { Router, RouterParams } from './types';
 
 /**
@@ -103,4 +107,31 @@ export function getMockPathInfo(
     }
   }
   return [filePath, { ...queryParams, ...restParams }];
+}
+
+const universalRequire = (() => {
+  try {
+    return createRequire(import.meta.url); // ✅ ESM
+  } catch {
+    return createRequire(pathToFileURL(__filename).href); // ✅ CJS fallback
+  }
+})();
+
+export { universalRequire };
+
+export function findWorkspaceRoot(isPnpmWorkspace: boolean): string {
+  if (!isPnpmWorkspace) {
+    return process.cwd();
+  }
+
+  let currentDir = process.cwd();
+
+  while (currentDir !== path.parse(currentDir).root) {
+    if (fs.existsSync(path.join(currentDir, 'pnpm-workspace.yaml'))) {
+      return currentDir;
+    }
+    currentDir = path.dirname(currentDir);
+  }
+
+  return process.cwd();
 }

@@ -1,13 +1,10 @@
 import { ViteDevServer, PluginOption } from 'vite';
 import getRawBody from 'raw-body';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import http from 'node:http';
 import fs from 'node:fs';
-import { isAjax, makeMockData, getMockPathInfo } from './utils';
+import { isAjax, makeMockData, getMockPathInfo, universalRequire as require, findWorkspaceRoot } from './utils';
 import type { PluginConfig, Router } from './types';
-
-const require = createRequire(import.meta.url);
 
 /**
  * Mock data response with optional delay
@@ -40,8 +37,11 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
     enable: true,
     pathMapConfig: '',
     delay: 0,
+    isPnpmWorkspace: false,
     ...opt,
   };
+
+  const workspaceRoot = findWorkspaceRoot(options.isPnpmWorkspace);
 
   return {
     name: 'vite-plugin-local-mock',
@@ -61,7 +61,7 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
         try {
           let routers: Router[] = [];
           if (options.pathMapConfig) {
-            const pathMapFile = path.join(process.cwd(), options.dir, options.pathMapConfig + '.cjs');
+            const pathMapFile = path.join(workspaceRoot, options.dir, options.pathMapConfig + '.cjs');
 
             if (fs.existsSync(pathMapFile)) {
               try {
@@ -74,7 +74,7 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
           }
 
           const [filePath, urlParams] = getMockPathInfo(req.url, routers);
-          const mockPath = path.join(process.cwd(), options.dir, filePath + '.cjs');
+          const mockPath = path.join(workspaceRoot, options.dir, filePath + '.cjs');
 
           if (!fs.existsSync(mockPath)) {
             next();
