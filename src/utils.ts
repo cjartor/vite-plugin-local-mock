@@ -77,8 +77,11 @@ export function parseRestUrl(url: string, path: string): RouterParams | null {
 /**
  * Find matching route and extract parameters from URL
  */
-function getRestUrlInfo(list: Router[], url: string): [string?, RouterParams?] {
+function getRestUrlInfo(list: Router[], url: string, method: http.IncomingMessage['method']): [string?, RouterParams?] {
   for (let i = 0; i < list.length; i++) {
+    if (list[i].method && list[i].method!.toLowerCase() !== method?.toLowerCase()) {
+      continue;
+    }
     const res = parseRestUrl(url, list[i].url);
     if (res) {
       return [list[i].path, res];
@@ -92,21 +95,22 @@ function getRestUrlInfo(list: Router[], url: string): [string?, RouterParams?] {
  */
 export function getMockPathInfo(
   url: http.IncomingMessage['url'] = '',
+  method: http.IncomingMessage['method'] = '',
   routers: Router[]
 ): [string, Record<string, any>] {
   const [reqPath = '', reqSearch = ''] = url.split('?');
-  let filePath = reqPath;
+  let filePath = '';
   let restParams: Record<string, any> = {};
   const queryParams = reqSearch ? queryString.parse(reqSearch) : {};
 
   if (routers?.length) {
-    const [rPath, rParams] = getRestUrlInfo(routers, reqPath);
+    const [rPath, rParams] = getRestUrlInfo(routers, reqPath, method);
     if (rPath) {
       filePath = rPath;
       restParams = rParams || {};
     }
   }
-  return [filePath, { ...queryParams, ...restParams }];
+  return [filePath || reqPath, { ...queryParams, ...restParams }];
 }
 
 const universalRequire = (() => {

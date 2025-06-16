@@ -8,8 +8,7 @@ A lightweight and flexible mock data plugin for Vite, perfect for frontend devel
 - 🔄 Support for dynamic routes with REST-style parameters
 - 📊 Support for dynamic response generation based on request parameters
 - ⏱️ Configurable response delay to simulate network latency
-- 📝 Detailed logging for easy debugging
-- 💾 Response caching for improved performance
+- 🔧 HTTP method specification for precise request matching
 
 ## Installation
 
@@ -35,7 +34,6 @@ export default defineConfig({
       dir: 'mock',
       enable: true,
       pathMapConfig: 'mockMap',
-      delay: 300, // milliseconds
     }),
   ],
 });
@@ -48,7 +46,6 @@ export default defineConfig({
 | `dir`           | `string`  | `'mock'` | Directory for mock files                                    |
 | `enable`        | `boolean` | `true`   | Enable or disable the plugin                                |
 | `pathMapConfig` | `string`  | `''`     | Filename for path mapping configuration (without extension) |
-| `delay`         | `number`  | `0`      | Response delay in milliseconds to simulate network latency  |
 
 ## Usage
 
@@ -105,16 +102,15 @@ localMock({
 
 ```js
 // mock/mockMap.cjs
-module.exports = [
-  {
-    url: 'api/users/:id',
+module.exports = {
+  'api/users/:id': {
+    method: 'GET',
     path: 'api/user-detail',
   },
-  {
-    url: 'api/products/:category/:id',
+  'api/products/:category/:id': {
     path: 'api/product-detail',
   },
-];
+};
 ```
 
 3. Create the corresponding mock files:
@@ -128,6 +124,59 @@ module.exports = (params) => ({
     id: params.id,
     name: `User ${params.id}`,
     email: `user${params.id}@example.com`,
+  },
+});
+```
+
+### HTTP Method Specification
+
+You can specify HTTP methods in your path mapping to handle different request types for the same URL:
+
+```js
+// mock/mockMap.cjs
+module.exports = {
+  'api/users/:id': {
+    method: 'GET',
+    path: 'api/user-detail',
+  },
+  'api/users': {
+    method: 'POST',
+    path: 'api/user-create',
+  },
+};
+```
+
+If no method is specified, the mock will match any HTTP method.
+
+### Response Delay
+
+You can simulate network latency by adding a `__delay` property to your mock response:
+
+```js
+// mock/api/slow-endpoint.cjs
+module.exports = {
+  __mock: true,
+  __delay: 2000, // Delay response by 2 seconds
+
+  code: 0,
+  data: {
+    message: 'This response was delayed by 2 seconds',
+  },
+};
+```
+
+You can also use delay with dynamic responses:
+
+```js
+// mock/api/dynamic-delay.cjs
+module.exports = (params) => ({
+  __mock: true,
+  __delay: parseInt(params.delay) || 1000, // Use delay from query parameter
+
+  code: 0,
+  data: {
+    delay: parseInt(params.delay) || 1000,
+    timestamp: Date.now(),
   },
 });
 ```

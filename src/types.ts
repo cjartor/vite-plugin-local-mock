@@ -36,6 +36,8 @@ export interface Router {
    * Path to the mock file (without extension)
    */
   path: string;
+
+  method?: string;
 }
 
 /**

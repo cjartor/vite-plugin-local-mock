@@ -12,11 +12,13 @@ import type { PluginConfig, Router } from './types';
  * @param data - Mock data to send
  * @param delay - Delay in milliseconds
  */
-function sendMockResponse(res: http.ServerResponse, data: any, delay?: number): void {
+function sendMockResponse(res: http.ServerResponse, data: any): void {
   const sendResponse = () => {
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify(data));
   };
+
+  const delay = data?.__delay || 0;
 
   if (delay && delay > 0) {
     setTimeout(sendResponse, delay);
@@ -66,14 +68,20 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
             if (fs.existsSync(pathMapFile)) {
               try {
                 delete require.cache[pathMapFile];
-                routers = require(pathMapFile);
+                const originRouters = require(pathMapFile);
+                routers = Object.keys(originRouters).map((key) => {
+                  return {
+                    ...originRouters[key],
+                    url: key,
+                  };
+                });
               } catch (err) {
                 // Error loading router config
               }
             }
           }
 
-          const [filePath, urlParams] = getMockPathInfo(req.url, routers);
+          const [filePath, urlParams] = getMockPathInfo(req.url, req.method, routers);
           const mockPath = path.join(workspaceRoot, options.dir, filePath + '.cjs');
 
           if (!fs.existsSync(mockPath)) {
@@ -109,7 +117,7 @@ const viteLocalMockPlugin = (opt?: PluginConfig): PluginOption => {
 
             const mockData = makeMockData(mockModule, params);
 
-            sendMockResponse(res, mockData, options.delay);
+            sendMockResponse(res, mockData);
           } catch (moduleError) {
             next();
           }

@@ -1,9 +1,12 @@
 {
   "name": "vite-plugin-local-mock",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "jiang025",
   "description": "vite plugin for local mock",
-  "repository": "https://github.com/jiang025/vite-plugin-local-mock.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jiang025/vite-plugin-local-mock.git"
+  },
   "files": [
     "dist"
   ],
