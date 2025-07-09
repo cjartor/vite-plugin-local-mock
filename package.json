@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-local-mock",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "jiang025",
   "description": "vite plugin for local mock",
   "repository": {
